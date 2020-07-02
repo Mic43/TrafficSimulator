@@ -13,6 +13,7 @@ module DomainModel =
     type Position2d= {X:float;Y:float}
     type Position = Position2d of Position2d
 
+
     type Crossing = {Name:option<string> ; Position:Position} 
    
     type Fraction = private Fraction of float
