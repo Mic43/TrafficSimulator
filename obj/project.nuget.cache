@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "o9ZCqKW0d7noNlUKPMeRyikz0hNLG+WbwmOG1b/2H73OZBtn6Tir+IlctkNw5+WQjofpkg5gaDvuO9Ayj8071A==",
+  "success": true,
+  "projectFilePath": "C:\\Michal\\F#\\TrafficSimulator\\TrafficSimulator.fsproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Michal\\.nuget\\packages\\fsharp.core\\4.7.1\\fsharp.core.4.7.1.nupkg.sha512"
+  ],
+  "logs": []
+}
