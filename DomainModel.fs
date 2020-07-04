@@ -4,17 +4,15 @@ namespace TrafficSimulator
 module DomainModel =    
     open Microsoft.FSharp.Data.UnitSystems.SI.UnitSymbols    
 
-    type Id = int
-    type Line = { Id:Id}
+    type CrossingId = CrossingId of int    
     type Curve = float
 
-    type Road = Straight of Line | Curved of Curve
+    type ConnectionType = Linear | Curved of Curve
 
     type Position2d= {X:float;Y:float}
     type Position = Position2d of Position2d
 
-
-    type Crossing = {Name:option<string> ; Position:Position} 
+    type Crossing = { Name:option<string> ; Position:Position} 
    
     type Fraction = private Fraction of float
     
@@ -31,37 +29,37 @@ module DomainModel =
         let add prog1 prog2 =
             create ((toFloat prog1) + (toFloat prog2))
 
-    type Connection = {Start:Crossing;End:Crossing}
-    type ConnectedRoad = {Road:Road;Connection:Connection}
+   // type Connection = {Start:Crossing;End:Crossing}
+    type Connection = {ConnectionType:ConnectionType;Start:CrossingId;End:CrossingId}
 
-    type VehicleLocation = {Placing:ConnectedRoad;CurrentProgress:Fraction}  
+    type VehicleLocation = {Placing:Connection;CurrentProgress:Fraction}  
     type Vehicle = {Location:VehicleLocation;CurrentSpeed:float<m/s>}
-       
-    type Roads = list<ConnectedRoad>
-          
+
+    module ConnectionsGraph = 
+        type T = private { Crossings:Map<CrossingId,Crossing>; CrossingsOutput: Map<CrossingId,Connection seq>;} 
+        let create (crossings: Map<CrossingId,Crossing>) (connections: Connection seq)  = 
+            if not (connections |> Seq.forall (fun connection -> crossings.ContainsKey connection.Start && crossings.ContainsKey connection.End))
+                then None
+                else
+                    let crossingOut = connections |> Seq.groupBy (fun con -> con.Start ) |> Map.ofSeq
+                    Some({Crossings = crossings;CrossingsOutput = crossingOut})
+   // type Roads = list<ConnectedRoad>
+  //  let a = dict<Road>      
        
  module DomainFunctions = 
     open Microsoft.FSharp.Data.UnitSystems.SI.UnitSymbols    
     let distanceToProgress (distance:float<m>) (connectionLenght:float<m>) = 
         Progress.create (distance / connectionLenght)
     
-    // let getPosition connection road progress
-    //     = match road with
-    //         | Curved -> 1
-    //         | Straight -> 0
-    // let updateProgress progress change = 
-    //     Progress.create progress + change
-    // let changeVehicleLocation vehicleLocation change= 
-    //     {vehicleLocation with CurrentProgress = Progress.create }
-    type RoadLenghtProvider = ConnectedRoad -> float<m>    
+    type RoadLenghtProvider = Connection -> float<m>    
     type VehicleUpdater = Vehicle->Vehicle
     type VehicleLocationUpdater = VehicleLocation->VehicleLocation
     type ProgressTravelledCalculator = unit -> Progress.T
 
     let roadLenghtProvider road = 
-        match road.Road with 
+        match road.ConnectionType with 
             |  Curved -> 0.0<m>
-            |  Straight -> 0.0<m>
+            |  Linear -> 0.0<m>
 
     let progressTravelledCalculator roadLenghtProvider vehicle timeChange  = 
         let distanceTravelled = vehicle.CurrentSpeed * timeChange
