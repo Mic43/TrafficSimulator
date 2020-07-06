@@ -1,8 +1,8 @@
 namespace TrafficSimulator
-    
+
+open Microsoft.FSharp.Data.UnitSystems.SI.UnitSymbols     
 [<AutoOpen>]
 module DomainModel =    
-    open Microsoft.FSharp.Data.UnitSystems.SI.UnitSymbols    
 
     type CrossingId = CrossingId of int    
     type Curve = float
@@ -14,10 +14,9 @@ module DomainModel =
 
     type Crossing = { Name:option<string> ; Position:Position} 
    
-    type Fraction = private Fraction of float
-    
-    module Progress =
-        type T = {Unities:int;Fractions:Fraction}
+    type Fraction =  Fraction of float    
+    type Progress = {Unities:int;Fractions:Fraction}
+    module Progress =       
         let create (value:float) = 
             {Unities = int value;Fractions = Fraction (value - float (int value))}
         let toFloat progress =
@@ -28,6 +27,9 @@ module DomainModel =
             create v
         let add prog1 prog2 =
             create ((toFloat prog1) + (toFloat prog2))
+        // let (|Progress|) {Unities=unities; Fractions=fractions} = struct (unities, fractions)
+        // let value progress =           
+        //     (progress.Unities,progress.Fractions) 
 
    // type Connection = {Start:Crossing;End:Crossing}
     type Connection = {ConnectionType:ConnectionType;Start:CrossingId;End:CrossingId}
@@ -35,14 +37,17 @@ module DomainModel =
     type VehicleLocation = {Placing:Connection;CurrentProgress:Fraction}  
     type Vehicle = {Location:VehicleLocation;CurrentSpeed:float<m/s>}
 
-    module ConnectionsGraph = 
-        type T = private { Crossings:Map<CrossingId,Crossing>; CrossingsOutput: Map<CrossingId,Connection seq>;} 
+    type ConnectionsGraph = private { Crossings:Map<CrossingId,Crossing>; CrossingsOutput: Map<CrossingId,Connection seq>;} 
+    module ConnectionsGraph =         
         let create (crossings: Map<CrossingId,Crossing>) (connections: Connection seq)  = 
             if not (connections |> Seq.forall (fun connection -> crossings.ContainsKey connection.Start && crossings.ContainsKey connection.End))
                 then None
                 else
                     let crossingOut = connections |> Seq.groupBy (fun con -> con.Start ) |> Map.ofSeq
                     Some({Crossings = crossings;CrossingsOutput = crossingOut})
+
+
+
    // type Roads = list<ConnectedRoad>
   //  let a = dict<Road>      
        
@@ -52,25 +57,29 @@ module DomainModel =
         Progress.create (distance / connectionLenght)
     
     type RoadLenghtProvider = Connection -> float<m>    
-    type VehicleUpdater = Vehicle->Vehicle
+    type VehicleUpdater = float<s>->Vehicle->Vehicle
     type VehicleLocationUpdater = VehicleLocation->VehicleLocation
-    type ProgressTravelledCalculator = unit -> Progress.T
+    type ProgressTravelledCalculator = unit -> Progress
 
-    let roadLenghtProvider road = 
-        match road.ConnectionType with 
-            |  Curved -> 0.0<m>
-            |  Linear -> 0.0<m>
+    let roadLenghtProvider (connectionsGraph:ConnectionsGraph) connection  =
+        match connection.ConnectionType with 
+            |  Curved -> 100.0<m>
+            |  Linear -> 100.0<m>
 
     let progressTravelledCalculator roadLenghtProvider vehicle timeChange  = 
         let distanceTravelled = vehicle.CurrentSpeed * timeChange
         let roadLenght = (roadLenghtProvider vehicle.Location.Placing)
         distanceToProgress distanceTravelled roadLenght
 
-    let simpleLocationUpdater  (progressTravelled: Progress.T) (vehicleLocation:VehicleLocation)= 
-        let newProgres = Progress.add (Progress.fromFraction vehicleLocation.CurrentProgress) progressTravelled
+    let simpleLocationUpdater  (progressTravelled: Progress) (vehicleLocation:VehicleLocation)= 
+        let newProgres = Progress.add (Progress.fromFraction vehicleLocation.CurrentProgress) progressTravelled      
         {vehicleLocation with CurrentProgress = newProgres.Fractions}
-
 
     let simpleVehicleUpdater (vehicleLocationUpdater:VehicleLocationUpdater) vehicle =  
         let newVehicleLocation = vehicleLocationUpdater vehicle.Location
         {vehicle with Location = newVehicleLocation}
+
+type Simulation = {ConnectionsGraph:ConnectionsGraph; Vehicles: Vehicle seq}
+module Simulation =     
+    let update (vehicleUpdater: DomainFunctions.VehicleUpdater) (timeChange:float<s>) (vehicles:Vehicle seq) = 
+        vehicles |> Seq.map (vehicleUpdater timeChange) 
