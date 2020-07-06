@@ -10,8 +10,13 @@ module DomainModel =
     type ConnectionType = Linear | Curved of Curve
 
     type Position2d= {X:float;Y:float}
-    type Position = Position2d of Position2d
-
+    type Position = Position2d of Position2d 
+    module Position = 
+        let distance (point:Position) (point2:Position) =
+            let p = (point,point2)  
+            match p with
+                | (Position2d p1,Position2d p2) -> sqrt ((p1.X - p2.X) * (p1.X - p2.X) - (p1.Y - p2.Y) * (p1.Y - p2.Y)) 
+                
     type Crossing = { Name:option<string> ; Position:Position} 
    
     type Fraction =  Fraction of float    
@@ -32,7 +37,7 @@ module DomainModel =
         //     (progress.Unities,progress.Fractions) 
 
    // type Connection = {Start:Crossing;End:Crossing}
-    type Connection = {ConnectionType:ConnectionType;Start:CrossingId;End:CrossingId}
+    type Connection = {ConnectionType:ConnectionType;StartId:CrossingId;EndId:CrossingId}
 
     type VehicleLocation = {Placing:Connection;CurrentProgress:Fraction}  
     type Vehicle = {Location:VehicleLocation;CurrentSpeed:float<m/s>}
@@ -40,13 +45,14 @@ module DomainModel =
     type ConnectionsGraph = private { Crossings:Map<CrossingId,Crossing>; CrossingsOutput: Map<CrossingId,Connection seq>;} 
     module ConnectionsGraph =         
         let create (crossings: Map<CrossingId,Crossing>) (connections: Connection seq)  = 
-            if not (connections |> Seq.forall (fun connection -> crossings.ContainsKey connection.Start && crossings.ContainsKey connection.End))
+            if not (connections |> Seq.forall (fun connection -> crossings.ContainsKey connection.StartId && crossings.ContainsKey connection.EndId))
                 then None
                 else
-                    let crossingOut = connections |> Seq.groupBy (fun con -> con.Start ) |> Map.ofSeq
+                    let crossingOut = connections |> Seq.groupBy (fun con -> con.StartId ) |> Map.ofSeq
                     Some({Crossings = crossings;CrossingsOutput = crossingOut})
-
-
+        let crossings connectionsGraph = connectionsGraph.Crossings
+        let crossing connectionsGraph crossingId = connectionsGraph.Crossings  |> Map.find  crossingId    
+        let crossingOutputs connectionsGraph crossingId = connectionsGraph.CrossingsOutput.Item crossingId
 
    // type Roads = list<ConnectedRoad>
   //  let a = dict<Road>      
@@ -56,15 +62,23 @@ module DomainModel =
     let distanceToProgress (distance:float<m>) (connectionLenght:float<m>) = 
         Progress.create (distance / connectionLenght)
     
-    type RoadLenghtProvider = Connection -> float<m>    
+    type ConnectionLenghtProvider = Connection -> float<m>    
     type VehicleUpdater = float<s>->Vehicle->Vehicle
     type VehicleLocationUpdater = VehicleLocation->VehicleLocation
     type ProgressTravelledCalculator = unit -> Progress
 
-    let roadLenghtProvider (connectionsGraph:ConnectionsGraph) connection  =
-        match connection.ConnectionType with 
-            |  Curved -> 100.0<m>
-            |  Linear -> 100.0<m>
+    module LenghtProviders = 
+        let constantLenghtProvider (connectionsGraph:ConnectionsGraph) connection  =
+            match connection.ConnectionType with 
+                |  Curved -> 100.0<m>
+                |  Linear -> 100.0<m>
+        let lenghtProvider (distancePerUnit:float<m>) (connectionsGraph:ConnectionsGraph) connection  =
+            match connection.ConnectionType with 
+                |  Curved -> failwith "Not implemented"
+                |  Linear -> let endC = ConnectionsGraph.crossing connectionsGraph connection.EndId
+                             let startC = ConnectionsGraph.crossing connectionsGraph connection.StartId                             
+                             let distance = Position.distance endC.Position startC.Position 
+                             distance * distancePerUnit
 
     let progressTravelledCalculator roadLenghtProvider vehicle timeChange  = 
         let distanceTravelled = vehicle.CurrentSpeed * timeChange

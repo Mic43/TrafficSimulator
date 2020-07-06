@@ -10,8 +10,9 @@ open Common
 [<EntryPoint>]
 let main argv =    
 
+    let distancePerUnit = 1.0<m>
     let simpleUpdater (connectionsGraph:ConnectionsGraph) = 
-        let progressCalc  = progressTravelledCalculator (roadLenghtProvider connectionsGraph)
+        let progressCalc  = progressTravelledCalculator (LenghtProviders.lenghtProvider distancePerUnit connectionsGraph)
         let locationUpdater timeChange vehicle = simpleLocationUpdater (progressCalc vehicle timeChange)
         let vehicleUpdater timeChange vehicle = vehicle |> simpleVehicleUpdater (locationUpdater timeChange vehicle)
         vehicleUpdater
@@ -20,8 +21,8 @@ let main argv =
         Map.empty (* Start with empty Map *)
            .Add( CrossingId 1, {Name = Some "aaa";Position = Position2d {X = 1.0;Y =2.0}})
            .Add( CrossingId 2, {Name = None ;Position = Position2d {X = 1.5;Y =4.0}})
-    let connections = [{ConnectionType = Linear ;Start= CrossingId 1;End = CrossingId 2};
-                       {ConnectionType = Linear ;Start= CrossingId 2;End = CrossingId 1}]    
+    let connections = [{ConnectionType = Linear ;StartId= CrossingId 1;EndId = CrossingId 2};
+                       {ConnectionType = Linear ;StartId= CrossingId 2;EndId = CrossingId 1}]    
     
                                
     let vehicles = [{Vehicle.CurrentSpeed = 10.0<m/s>; 
