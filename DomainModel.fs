@@ -36,7 +36,6 @@ module DomainModel =
         // let value progress =           
         //     (progress.Unities,progress.Fractions) 
 
-   // type Connection = {Start:Crossing;End:Crossing}
     type Connection = {ConnectionType:ConnectionType;StartId:CrossingId;EndId:CrossingId}
 
     type VehicleLocation = {Placing:Connection;CurrentProgress:Fraction}  
@@ -66,6 +65,7 @@ module DomainModel =
     type VehicleUpdater = float<s>->Vehicle->Vehicle
     type VehicleLocationUpdater = VehicleLocation->VehicleLocation
     type ProgressTravelledCalculator = unit -> Progress
+    type VehiclesUpdater = float<s>->Vehicle seq->Vehicle seq
 
     module LenghtProviders = 
         let constantLenghtProvider (connectionsGraph:ConnectionsGraph) connection  =
@@ -79,21 +79,37 @@ module DomainModel =
                              let startC = ConnectionsGraph.crossing connectionsGraph connection.StartId                             
                              let distance = Position.distance endC.Position startC.Position 
                              distance * distancePerUnit
-
     let progressTravelledCalculator roadLenghtProvider vehicle timeChange  = 
         let distanceTravelled = vehicle.CurrentSpeed * timeChange
         let roadLenght = (roadLenghtProvider vehicle.Location.Placing)
         distanceToProgress distanceTravelled roadLenght
 
-    let simpleLocationUpdater  (progressTravelled: Progress) (vehicleLocation:VehicleLocation)= 
-        let newProgres = Progress.add (Progress.fromFraction vehicleLocation.CurrentProgress) progressTravelled      
-        {vehicleLocation with CurrentProgress = newProgres.Fractions}
+    module VehicleLocationUpdaters = 
+        let simpleLocationUpdater  (progressTravelled: Progress) (vehicleLocation:VehicleLocation)= 
+            let newProgres = Progress.add (Progress.fromFraction vehicleLocation.CurrentProgress) progressTravelled      
+            {vehicleLocation with CurrentProgress = newProgres.Fractions}
+
+        let locationUpdater (connectionsGraph:ConnectionsGraph) (progressTravelled: Progress) (vehicleLocation:VehicleLocation)= 
+            let newProgres = Progress.add (Progress.fromFraction vehicleLocation.CurrentProgress) progressTravelled      
+            let destination = ConnectionsGraph.crossingOutputs connectionsGraph vehicleLocation.Placing.EndId |> Seq.tryHead
+            let newPlacing = if newProgres.Unities < 1      
+                                then vehicleLocation.Placing 
+                                else destination |> Option.defaultValue vehicleLocation.Placing
+            {CurrentProgress = newProgres.Fractions;Placing = newPlacing}
 
     let simpleVehicleUpdater (vehicleLocationUpdater:VehicleLocationUpdater) vehicle =  
         let newVehicleLocation = vehicleLocationUpdater vehicle.Location
         {vehicle with Location = newVehicleLocation}
 
-type Simulation = {ConnectionsGraph:ConnectionsGraph; Vehicles: Vehicle seq}
-module Simulation =     
-    let update (vehicleUpdater: DomainFunctions.VehicleUpdater) (timeChange:float<s>) (vehicles:Vehicle seq) = 
-        vehicles |> Seq.map (vehicleUpdater timeChange) 
+    module VehiclesUpdaters =     
+        let update (vehicleUpdater: VehicleUpdater) (timeChange:float<s>) (vehicles:Vehicle seq) = 
+            vehicles |> Seq.map (vehicleUpdater timeChange) 
+        let updateByPlacing (vehiclesUpdater: VehiclesUpdater) (timeChange:float<s>) (vehicles:Vehicle seq) = 
+            vehicles |> Seq.groupBy (fun v -> v.Location.Placing) 
+                     |> Seq.map (fun (_,vehicles) ->  vehicles |> Seq.sortByDescending (fun v->v.Location.CurrentProgress)) 
+                     |> Seq.map (fun vehiclesOnSameConnection -> vehiclesOnSameConnection |> vehiclesUpdater timeChange)
+                     |> Seq.fold (fun acc cur -> acc |> Seq.append cur) Seq.empty
+                                                                
+    type Simulation = {ConnectionsGraph:ConnectionsGraph; Vehicles: Vehicle seq}
+
+    
