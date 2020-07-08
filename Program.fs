@@ -32,7 +32,7 @@ let main argv =
                                
     let vehicles = [{Vehicle.CurrentSpeed = 10.0<m/s>; 
                     Vehicle.Location = 
-                        {VehicleLocation.CurrentProgress = (Fraction 0.0);
+                        {VehicleLocation.CurrentProgress = (Fraction.zero);
                          Placing = connections.[0]} }]
     let connectionsGraph = ConnectionsGraph.create crossings connections      
     
