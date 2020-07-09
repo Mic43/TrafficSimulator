@@ -6,22 +6,25 @@ open DomainFunctions
 
 module Setup = 
     let distancePerUnit = 1.0<m>
-    let  simpleUpdater (connectionsGraph:ConnectionsGraph) = 
-        let progressCalc  = progressTravelledCalculator (LenghtProviders.lenghtProvider distancePerUnit connectionsGraph)
-        let locationUpdater timeChange vehicle = VehicleLocationUpdaters.simpleLocationUpdater (progressCalc vehicle timeChange)
-        let vehicleUpdater timeChange vehicle = vehicle |> simpleVehicleUpdater (locationUpdater timeChange vehicle)
-        vehicleUpdater
+    module VehicleUpdaters =
+        let  simpleUpdater (connectionsGraph:ConnectionsGraph) = 
+            let progressCalc  = progressTravelledCalculator (LenghtProviders.lenghtProvider distancePerUnit connectionsGraph)
+            let locationUpdater timeChange vehicle = VehicleLocationUpdaters.simpleLocationUpdater (progressCalc vehicle timeChange)
+            let vehicleUpdater timeChange vehicle = vehicle |> simpleVehicleUpdater (locationUpdater timeChange vehicle)
+            vehicleUpdater
 
-    let simpleUpdater2 (connectionsGraph:ConnectionsGraph) = 
-        let progressCalc  = progressTravelledCalculator (LenghtProviders.lenghtProvider distancePerUnit connectionsGraph)
-        let locationUpdater timeChange vehicle = VehicleLocationUpdaters.locationUpdater connectionsGraph (progressCalc vehicle timeChange)
-        let vehicleUpdater timeChange vehicle = vehicle |> simpleVehicleUpdater (locationUpdater timeChange vehicle)
-        vehicleUpdater
+        let simpleUpdater2 (connectionsGraph:ConnectionsGraph) = 
+            let progressCalc  = progressTravelledCalculator (LenghtProviders.lenghtProvider distancePerUnit connectionsGraph)
+            let locationUpdater timeChange vehicle = VehicleLocationUpdaters.locationUpdater connectionsGraph (progressCalc vehicle timeChange)
+            let vehicleUpdater timeChange vehicle = vehicle |> simpleVehicleUpdater (locationUpdater timeChange vehicle)
+            vehicleUpdater
 
     let updateSimulationState simulationState timeInterval = 
-        let newVehicles = DomainFunctions.VehiclesUpdaters.update (simpleUpdater2 simulationState.ConnectionsGraph) 
-                            timeInterval simulationState.Vehicles
+        let innerVehiclesUpdater = DomainFunctions.VehiclesUpdaters.update (VehicleUpdaters.simpleUpdater2 simulationState.ConnectionsGraph) 
+        let vehiclesUpdater = DomainFunctions.VehiclesUpdaters.updateByPlacing innerVehiclesUpdater
+        let newVehicles = vehiclesUpdater timeInterval simulationState.Vehicles
         { simulationState with Vehicles = newVehicles}
+
     let init () = 
         let crossings =
             Map.empty (* Start with empty Map *)
@@ -35,5 +38,8 @@ module Setup =
                         Vehicle.Location = 
                             {VehicleLocation.CurrentProgress = (Fraction.zero);
                              Placing = connections.[0]} }]
-        let connectionsGraph = ConnectionsGraph.create crossings connections      
-        {SimulationState.Vehicles = vehicles; SimulationState.ConnectionsGraph = connectionsGraph.Value}
+        let connectionsGraph = ConnectionsGraph.create crossings connections     
+        match connectionsGraph with
+            | Some (cg) -> {SimulationState.Vehicles = vehicles; SimulationState.ConnectionsGraph = cg}
+            | None -> invalidOp "Critical error creating connections graph"
+        

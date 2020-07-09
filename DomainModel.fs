@@ -1,7 +1,7 @@
 namespace TrafficSimulator
 
 open Microsoft.FSharp.Data.UnitSystems.SI.UnitSymbols     
-[<AutoOpen>]
+
 module DomainModel =    
 
     type CrossingId = CrossingId of int   
@@ -10,13 +10,13 @@ module DomainModel =
 
     type ConnectionType = Linear | Curved of Curve
 
-    type Position2d= {X:float;Y:float}
+    type [<Struct>] Position2d=  {X:float;Y:float}
     type Position = Position2d of Position2d 
     module Position = 
         let distance (point:Position) (point2:Position) =
             let p = (point,point2)  
             match p with
-                | (Position2d p1,Position2d p2) -> sqrt ((p1.X - p2.X) * (p1.X - p2.X) - (p1.Y - p2.Y) * (p1.Y - p2.Y)) 
+                | (Position2d p1,Position2d p2) -> sqrt ((p1.X - p2.X) * (p1.X - p2.X) + (p1.Y - p2.Y) * (p1.Y - p2.Y)) 
                 
     type Crossing = { Name:option<string> ; Position:Position} 
    
@@ -66,6 +66,7 @@ module DomainModel =
   //  let a = dict<Road>      
        
  module DomainFunctions = 
+    open DomainModel
     open Microsoft.FSharp.Data.UnitSystems.SI.UnitSymbols    
     let distanceToProgress (distance:float<m>) (connectionLenght:float<m>) = 
         Progress.create (distance / connectionLenght)
